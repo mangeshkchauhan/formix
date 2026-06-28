@@ -1,9 +1,27 @@
+import { useEffect, useState } from 'react'
 import { IconFile, IconTrash } from '../../components/icons'
 import { Button, ConfigRow, TextInput } from '../../components/ui'
 import { formatBytes } from '../../lib/format'
 import { defineField } from '../contract'
 import type { FileMeta, FileUploadField } from '../types'
 import { asFileList } from '../value'
+
+function normalizeExtension(ext: string): string {
+  const trimmed = ext.trim().toLowerCase()
+  if (!trimmed) return ''
+  return trimmed.startsWith('.') ? trimmed : `.${trimmed}`
+}
+
+function parseAllowedTypes(raw: string): string[] {
+  return raw
+    .split(',')
+    .map(normalizeExtension)
+    .filter(Boolean)
+}
+
+function formatAllowedTypes(types: string[]): string {
+  return types.join(', ')
+}
 
 export const fileUploadDefinition = defineField<FileUploadField>({
   type: 'fileUpload',
@@ -25,6 +43,16 @@ export const fileUploadDefinition = defineField<FileUploadField>({
   ConfigPanel: ({ field, onChange }) => {
     const set = (patch: Partial<FileUploadField['config']>) =>
       onChange({ ...field, config: { ...field.config, ...patch } })
+    const [typesText, setTypesText] = useState(() =>
+      formatAllowedTypes(field.config.allowedTypes),
+    )
+
+    useEffect(() => {
+      setTypesText(formatAllowedTypes(field.config.allowedTypes))
+      // Sync when selecting a different field, not on every config edit while typing.
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- field.id only
+    }, [field.id])
+
     return (
       <>
         <ConfigRow
@@ -32,15 +60,16 @@ export const fileUploadDefinition = defineField<FileUploadField>({
           hint="Comma-separated extensions, e.g. .pdf, .jpg, .png"
         >
           <TextInput
-            value={field.config.allowedTypes.join(', ')}
-            onChange={(e) =>
-              set({
-                allowedTypes: e.target.value
-                  .split(',')
-                  .map((t) => t.trim())
-                  .filter(Boolean),
-              })
-            }
+            value={typesText}
+            onChange={(e) => {
+              setTypesText(e.target.value)
+              set({ allowedTypes: parseAllowedTypes(e.target.value) })
+            }}
+            onBlur={() => {
+              const parsed = parseAllowedTypes(typesText)
+              set({ allowedTypes: parsed })
+              setTypesText(formatAllowedTypes(parsed))
+            }}
             placeholder=".pdf, .jpg, .png"
           />
         </ConfigRow>
@@ -91,7 +120,7 @@ export const fileUploadDefinition = defineField<FileUploadField>({
           <input
             type="file"
             multiple={maxFiles !== 1}
-            accept={allowedTypes.join(',') || undefined}
+            accept={allowedTypes.map(normalizeExtension).join(',') || undefined}
             disabled={disabled}
             className="hidden"
             onChange={(e) => {
@@ -135,7 +164,7 @@ export const fileUploadDefinition = defineField<FileUploadField>({
       return `At most ${maxFiles} file(s) allowed`
     }
     if (allowedTypes.length > 0) {
-      const normalized = allowedTypes.map((t) => t.toLowerCase())
+      const normalized = allowedTypes.map(normalizeExtension)
       const invalid = files.find(
         (file) => !normalized.some((ext) => file.name.toLowerCase().endsWith(ext)),
       )

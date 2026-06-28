@@ -28,9 +28,13 @@ bun run typecheck # tsc --noEmit
 
 ## Features
 
-- **10 field capabilities**: Single Line Text, Multi-line Text, Number, Date,
-  Single Select (radio / dropdown / tiles), Multi Select, File Upload (metadata only),
-  Section Header, Conditional Logic (on every field), and Calculation.
+- **10 spec capabilities** — **9 registered field types** in `src/fields/registry.ts`
+  plus **conditional logic** as a cross-cutting capability:
+  - **Field types:** Single Line Text, Multi-line Text, Number, Date, Single Select
+    (radio / dropdown / tiles), Multi Select, File Upload (metadata only), Section
+    Header, and Calculation.
+  - **Capability (not a type):** Conditional Logic — available on every field via
+    `conditions` and configured in the shared `ConditionsEditor`.
 - **Builder Mode**: left palette (click or drag to add), center canvas with
   drag-and-drop reordering plus up/down buttons, right configuration panel, Save, and
   inline Preview.
@@ -49,16 +53,20 @@ bun run typecheck # tsc --noEmit
 Two versioned, top-level keys managed by Zustand's `persist` middleware:
 
 ```
-formix:templates:v1   ->  { state: { templates: FormTemplate[] }, version: 1 }
+formix:templates:v1   ->  { state: { templates: FormTemplate[] }, version: 2 }
 formix:instances:v1   ->  { state: { instances: FormInstance[] }, version: 1 }
 ```
+
+The `:v1` key suffix is stable; the inner `version` is what Zustand `migrate()` uses.
+Templates are at **version 2** (migration backfills `favorite: false` on older records).
+Instances remain at version 1.
 
 ```ts
 interface FormTemplate {
   id: string
   title: string
   fields: AnyField[]      // discriminated union keyed on `type`
-  favorite: boolean       // surfaced in the Favourites view
+  favorite: boolean       // surfaced in the Favourites view (British spelling in routes/UI)
   createdAt: string       // ISO
   updatedAt: string       // ISO
 }
@@ -92,17 +100,20 @@ interface FormInstance {
 
 ## Architecture & key decisions
 
-### Field registry — adding an 11th field type touches one folder
+### Field registry — adding an 11th field type
 
 Every field type lives in `src/fields/<type>/definition.tsx` and implements a single
-`FieldDefinition` contract (`src/fields/contract.ts`): palette metadata, `createDefault`,
-`ConfigPanel`, `Renderer`, `getEmptyValue`, `validate`, `validateConfig` (builder-time
-config rules), `toPdf`, and (for condition targets) `operators` + `evaluate`.
+`FieldDefinition` contract (`src/fields/contract.ts`): palette metadata (including
+`category` for palette grouping), `createDefault`, `ConfigPanel`, `Renderer`,
+`getEmptyValue`, `validate`, `validateConfig` (builder-time config rules), `toPdf`, and
+(for condition targets) `operators` + `evaluate`.
 
 All UI surfaces — the Builder palette, the configuration panel, the Fill renderer,
 validation, conditional-logic operators, and PDF serialization — read from
-`src/fields/registry.ts`. **Adding a new field type means creating one folder and adding
-one line to the registry map; no other file changes.**
+`src/fields/registry.ts`. **Adding a new field type means:** create one folder with
+`definition.tsx`, extend the `FieldType` union in `types.ts`, and add one entry to
+`fieldRegistry`. Shared shells (`ConfigPanel`, `ConditionsEditor`, `OptionsEditor`) are
+unchanged.
 
 ```
 fields/
@@ -127,7 +138,10 @@ resolveFieldStates(fields, values): Record<fieldId, { visible, required }>
   "become required when Y"), so this ordered/override model was chosen as strictly more
   expressive and predictable.
 - **Chained conditions** (A depends on B depends on C) are resolved by **iterating to a
-  fixpoint** with a cycle guard, so changes cascade and converge deterministically.
+  fixpoint** bounded by `fields.length + 2` iterations, so changes cascade and converge
+  deterministically for normal forms.
+- **Valid condition targets:** text, number, date, and select fields (those with
+  `operators`). File Upload, Calculation, and Section Header cannot be targets.
 - **Hidden targets contribute no value:** when a condition's target field is currently
   hidden, its value is treated as empty.
 - **Hidden-but-required is safe:** a hidden field is forced to non-required, never
@@ -141,6 +155,8 @@ resolveFieldStates(fields, values): Record<fieldId, { visible, required }>
 shows `—` when nothing is computable, and rounds to the configured precision. Calculation
 fields are always read-only and **cannot source another calculation field**. They
 recompute synchronously via a memo in `FormRenderer`, so they update in real time.
+Submitted instances may include calculation values, but Response view and PDF **recompute**
+from stored source numbers.
 
 ### Validation
 
@@ -174,7 +190,10 @@ are used.
 ### State & routing
 
 Zustand stores (`store/templates.ts`, `store/instances.ts`) own all persisted data;
-Builder Mode keeps an editable draft in local component state and commits on Save.
+Builder Mode keeps an editable **draft** in local component state and commits on Save.
+The Builder **Preview** tab tests the unsaved draft; **Fill Mode** (`/fill/...`) and
+“New Response” from the home card always use the **last saved** template. The Builder
+Responses tab warns when there are unsaved changes.
 
 Routing uses the **Next.js App Router** (`app/`) with `next/navigation`. The `app/(main)`
 route group shares a common chrome via `AppLayout`, and the routes are:
@@ -202,19 +221,20 @@ markup mismatches while keeping real, refresh-safe URLs.
   submitted data, and PDF.
 - **Single Select** empty = no option selected; `does not equal` is `true` when nothing
   is selected.
-- **Numbers** are formatted to the configured decimals; the `is within range` operator is
-  inclusive on both ends.
+- **Numbers** are stored as entered; decimals apply on display, PDF, and calculation
+  output (no blur-time clamping). The `is within range` operator is inclusive on both ends.
 - **Dates** are stored as ISO `yyyy-mm-dd`; `prefillToday` sets the value when a new
   response is opened.
 - **Section Header** captures no value and is excluded from submitted data, but its
   heading still renders in the PDF for grouping.
 - **File Upload** stores metadata only; the PDF lists `name (size, type)` and notes that
-  contents are not embedded.
+  contents are not embedded. Empty `allowedTypes` in the builder means any file type is
+  accepted at fill time.
 - **Calculation keeps a Required toggle and conditional logic** like any other input,
   even though the spec lists neither for it: a calculation can legitimately be required
   (e.g. an order total that must compute) and conditionally shown. A required calculation
   that resolves to no value (no/empty sources) fails submit-time validation like any other
-  empty required field.
+  empty required field. A visible but empty calculation shows “No answer” in PDF export.
 - **Incomplete field config blocks Save** (rather than warning or saving silently) so a
   template is never persisted in a non-functional state; see "Builder-time configuration
   validation" above.
@@ -222,6 +242,12 @@ markup mismatches while keeping real, refresh-safe URLs.
   Builder Mode flags that past responses may show stale or missing values, since instances
   store raw values keyed by field id and are not migrated. Versioning is noted below as a
   future improvement.
+- **Submitted responses are read-only** — view or re-export PDF; submit again for a new instance.
+- **Template delete** is on the home/favourites card (confirms, then deletes template and
+  all its instances). Builder has no delete action.
+- **Spelling:** persisted `favorite`; routes and UI use British `favourites`.
+- **No localStorage recovery** — clearing browser storage or quota errors remove all
+  templates and responses; there is no in-app backup (export/import is future work).
 
 ---
 
@@ -239,5 +265,5 @@ markup mismatches while keeping real, refresh-safe URLs.
 
 ## Project documents
 
-- [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — the full design document.
+- [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — the full design document (authoritative for architecture and the §12 decision log).
 - [`AI_USAGE_LOG.md`](AI_USAGE_LOG.md) — AI usage log (prompts, verification, corrections).

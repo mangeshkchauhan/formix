@@ -94,9 +94,11 @@ src/
 ```
 
 **Extension promise (grading criterion):** adding an 11th field type = create one
-folder under `fields/` and add one line to `registry.ts`. The palette, config panel,
-fill renderer, validation, conditional operators, and PDF serialization all read from
-the registry — no other file is edited.
+folder under `fields/` with a `definition.tsx`, extend the `FieldType` union in
+`types.ts`, and add one line to `fieldRegistry` in `registry.ts`. The palette, config
+panel, fill renderer, validation, conditional operators, and PDF serialization all
+read from the registry. Shared shells (`ConfigPanel`, `ConditionsEditor`, `OptionsEditor`)
+are unchanged; conditional-logic UI is not part of the per-type folder.
 
 ---
 
@@ -144,7 +146,7 @@ export interface DateField extends BaseField {
   type: 'date';
   config: { prefillToday: boolean; minDate?: string; maxDate?: string };
 }
-export interface Option { id: string; label: string; value: string }
+export interface Option { id: string; label: string } // answers store option id; label resolved at display/PDF
 export interface SingleSelectField extends BaseField {
   type: 'singleSelect';
   config: { options: Option[]; display: 'radio' | 'dropdown' | 'tiles' };
@@ -233,9 +235,13 @@ export interface FormInstance {
 Two top-level, **versioned** keys managed by Zustand `persist`:
 
 ```
-formix:templates:v1   ->  { state: { templates: FormTemplate[] }, version: 1 }
+formix:templates:v1   ->  { state: { templates: FormTemplate[] }, version: 2 }
 formix:instances:v1   ->  { state: { instances: FormInstance[] }, version: 1 }
 ```
+
+The `:v1` suffix on the storage key is stable; the inner `version` field is what
+Zustand `persist` uses for `migrate()`. Templates are at **version 2** with a migration
+that backfills `favorite: false` on older records.
 
 Reasoning:
 - **Separate templates and instances.** Instances reference a template by `templateId`.
@@ -260,6 +266,7 @@ export interface FieldDefinition<F extends AnyField = AnyField> {
   type: F['type'];
   paletteLabel: string;
   paletteDescription: string;
+  category: FieldCategory;                       // palette section: layout | text | numberDate | choice | advanced
   icon: ReactNode;
   isInput: boolean;                              // false for sectionHeader
   createDefault: (id: string) => F;              // factory for a new field
@@ -275,10 +282,13 @@ export interface FieldDefinition<F extends AnyField = AnyField> {
 }
 
 export const fieldRegistry: Record<FieldType, FieldDefinition> = { /* one entry per folder */ };
-export const fieldList: FieldDefinition[] = Object.values(fieldRegistry); // drives palette
+export const fieldDefinitions: FieldDefinition[] = Object.values(fieldRegistry);
+export function getFieldDefinitionsByCategory(): /* grouped palette sections */ ...
 ```
 
 Every UI surface iterates the registry instead of `switch`-ing on type in many files.
+The palette uses `getFieldDefinitionsByCategory()` so fields render under Layout, Text,
+Number & Date, Choice, and Advanced headings.
 
 ---
 
@@ -304,8 +314,10 @@ the last matching condition wins per dimension** (visibility, required).
 - A field's value only counts if that field is itself **visible**. When evaluating a
   condition whose target is currently hidden, the target's value is treated as empty.
 - Because visibility can depend on other fields' visibility, states are resolved by
-  **iterating to a fixpoint** (re-evaluate until no state changes), with a max-iteration
-  cycle guard. This correctly handles chains A→B→C and converges deterministically.
+  **iterating to a fixpoint** (re-evaluate until no state changes), bounded by
+  `fields.length + 2` iterations. This correctly handles chains A→B→C and converges
+  deterministically for normal forms; pathological graphs may stop before full convergence
+  (no user-facing warning — see Section 14).
 
 **Enforced rules (from spec):**
 - A field cannot target itself (UI removes the owning field from target options).
@@ -362,18 +374,25 @@ File-system routes under `app/` (App Router); `[templateId]` is a dynamic segmen
 | `/fill/[templateId]` | Fill Mode — new instance |
 | `/templates/[templateId]/instances` | Filled instances list |
 
-- **Builder Preview** reuses `FormRenderer` inside a modal (no route change).
+- **Builder** uses in-page **tabs** (`build` | `preview` | `responses`) — no route change.
+  Preview reuses `FormRenderer` on the preview tab; modals are used for mobile
+  palette/config and for viewing a single response.
 - **New Response** on a card routes to `/fill/[templateId]`.
+- **Draft vs saved:** Builder keeps an editable draft in component state until Save.
+  The Preview tab tests the **unsaved** draft; `/fill/[templateId]` and “New Response”
+  from the home card use the **last saved** template. The Responses tab warns when the
+  draft is dirty.
 - All state is in Zustand+localStorage, so every route works after a full refresh
   (data-driven views render inside a `ClientOnly` boundary after hydration).
 
 ### Builder Mode layout
-- **Left:** `FieldPalette` (generated from `fieldList`) — click or drag to add.
+- **Left:** `FieldPalette` (from `getFieldDefinitionsByCategory()`) — click or drag to add.
 - **Center:** `FieldCanvas` — dnd-kit sortable list; up/down buttons as accessible
   fallback; click selects a field.
 - **Right:** `ConfigPanel` — common fields (label, default visibility/required) +
   the registry `ConfigPanel` + shared `ConditionsEditor`.
-- Save persists template; Preview opens the modal.
+- Save persists template; Preview switches to the preview tab (config validation runs on
+  Preview submit, not when opening the tab).
 
 ---
 
@@ -399,11 +418,19 @@ File: `pdf/printInstance.ts`.
 - **Multiple conditions:** ordered, last-match-wins per dimension (Section 6).
 - **Hidden values** never count for validation, calculations, conditions, submission, or PDF.
 - **Single Select empty value** = no option selected; required fails if none chosen.
-- **Number decimals** clamp/format on blur; `inRange` condition value is `{min,max}` inclusive.
+- **Number decimals** — value stored as entered; precision applied on display, in PDF,
+  and when feeding calculations (`formatNumber` / `round`). No blur-time clamping.
+  `inRange` condition value is `{min,max}` inclusive.
 - **Date** stored as ISO `yyyy-mm-dd`; `prefillToday` sets value on instance open only.
 - **Section Header** captures no value and is skipped in validation/submit/PDF data,
   but its heading still renders in the PDF for grouping.
-- **Calculation** with no usable sources renders `—` and is omitted from PDF if empty.
+- **Calculation** with no usable sources renders `—` in the form; in PDF the label row
+  still appears with a “No answer” placeholder when visible but empty.
+- **File Upload** with empty `allowedTypes` accepts any file at fill time (no builder block).
+- **Submitted responses are read-only** — no in-app edit/amend flow; submit again for a new instance.
+- **Template delete** is available from the home/favourites card (also deletes instances);
+  Builder has no delete action.
+- **Spelling:** persisted field is `favorite`; routes and UI use British `favourites`.
 
 ---
 
@@ -423,7 +450,7 @@ single place a reviewer can see every judgment call and where it is enforced in 
 | 6 | Should the builder **validate field config on Save**, or save anything? | **Block save** with inline errors; never persist an unusable template. | A template saved in a broken state degrades every downstream surface (fill, PDF). Surfacing problems at authoring time is cheapest. | `logic/configValidation.ts` (generic Label-required) + each field's `validateConfig` (selects need ≥1 labelled option; Multi Select `min ≤ max` and `max ≤ option count`; Number / Date / text `min ≤ max`; File Upload `maxFiles ≥ 1`) |
 | 7 | What happens when **editing a template that already has responses**? | **Allowed, but warned.** A banner notes past responses may show stale/missing values. | Instances store raw values keyed by field id and are not migrated; blocking edits is too strict, silent edits are surprising. Versioning is a documented future improvement. | `builder/BuilderEditor.tsx` (instance-count banner) |
 | 8 | How should **File Upload** render in the PDF (metadata-only storage)? | List `name (size, type)` plus a "contents are not embedded" note. | Conveys what was attached without pretending file bytes exist. | `fields/fileUpload/definition.tsx` (`toPdf`), `pdf/printInstance.ts` |
-| 9 | Can a condition **target a Calculation or Section Header value**? | **No** — neither is a valid condition target. | Section Header captures no value; Calculation is derived (the operator table omits both). Targets are gated on having `operators`. | `fields/registry.ts` (`canBeConditionTarget`) |
+| 9 | Can a condition **target File Upload, Calculation, or Section Header**? | **No** — none are valid condition targets. | Section Header captures no value; Calculation is derived; File Upload has no condition operators. Targets are gated on having `operators`. | `fields/registry.ts` (`canBeConditionTarget`) |
 | 10 | Are numeric **`is within range`** and date **`before` / `after`** bounds inclusive? | `inRange` is **inclusive** on both ends; `before` / `after` are **strict** (exclusive). | Matches the most common reading of "within range" vs "before/after a date". | `fields/number/definition.tsx`, `fields/date/definition.tsx` (`evaluate`) |
 | 11 | Does **Number `decimals`** round the stored value or only the display? | Stored as entered; **precision is applied on display and in the PDF** (and when used as a calc source result). | Avoids lossy mutation of user input while keeping presentation consistent. | `lib/format.ts` (`round` / `formatNumber`) |
 | 12 | **`prefillToday`** vs a min/max date range — what if today is out of range? | Prefill still sets **today**; submit-time validation then surfaces the range error. | Prefill is a convenience default; the user is shown the conflict rather than having it silently altered. | `fill/initialValues.ts`, `fields/date/definition.tsx` (`validate`) |
@@ -436,6 +463,12 @@ single place a reviewer can see every judgment call and where it is enforced in 
   to another type, its id is **silently skipped** at compute time, and `validateConfig`
   only complains when *zero* valid sources remain. Active pruning of dead source ids (or
   an inline "some sources are no longer valid" warning) is deferred — see Section 14.
+- **Orphaned condition targets.** If a targeted field is deleted, its id remains on
+  surviving conditions and is **silently ignored** at resolve time (`if (!target) continue`).
+  No builder prune/warn — deferred with Section 14 improvements.
+- **Calculation values in instances.** Submit persists calculation answers alongside source
+  values, but Response view and PDF **recompute** calculations from stored sources; the
+  persisted calc snapshot is redundant for display.
 
 ---
 

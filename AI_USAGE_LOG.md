@@ -6,8 +6,11 @@ verified before trusting output, and what was rejected or corrected.
 ## Prompt 1 — Architecture & extensibility contract
 
 **Refined prompt**
-> "I'm building a React 19 + TypeScript form builder (Builder + Fill mode) with 9 field
-> types, conditional logic, calculations, and native-only PDF export. Before any code,
+> "I'm building a React 19 + TypeScript form builder (Builder + Fill mode) with 9
+> registry field types (Single Line Text, Multi-line Text, Number, Date, Single Select,
+> Multi Select, File Upload, Section Header, Calculation), conditional logic as a
+> cross-cutting capability on every field, and native-only PDF
+> export. Before any code,
 > propose a `FieldDefinition` registry so adding a new field type only requires creating
 > one file and registering it — no edits to the palette, config panel, fill renderer,
 > validation, or PDF code. Give me the discriminated-union field types and the registry
@@ -20,6 +23,7 @@ verified before trusting output, and what was rejected or corrected.
   needed a special case outside the registry.
 - That the discriminated union made `switch (field.type)` exhaustive (TS errors when a
   case is missing).
+- That the spec’s **10 capabilities** = **9 registered field types** plus **conditional logic** as a cross-cutting capability (not a tenth `FieldType`).
 
 **What I changed**
 - The first version put `required` as a top-level field property *and* inside per-type

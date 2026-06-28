@@ -65,7 +65,7 @@ function FieldRowComponent({
       </div>
 
       <div
-        className="absolute right-2 top-2 flex items-center gap-0.5 rounded-lg border border-line bg-white opacity-0 shadow-sm transition focus-within:opacity-100 group-hover:opacity-100"
+        className="absolute right-2 top-2 flex items-center gap-0.5 rounded-lg border border-line bg-white opacity-100 shadow-sm transition focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         onClick={stop}
       >
         <button

@@ -35,7 +35,8 @@ import {
 } from '../logic/configValidation'
 import { Button, TextInput } from '../components/ui'
 import { Logo } from '../components/Logo'
-import { IconChevronLeft } from '../components/icons'
+import { Modal } from '../components/Modal'
+import { IconChevronLeft, IconPlus } from '../components/icons'
 import { FormRenderer } from '../fill/FormRenderer'
 import { ResponsesPanel } from '../fill/ResponsesPanel'
 import { ConfigPanel } from './ConfigPanel'
@@ -48,6 +49,7 @@ type ActiveDrag =
   | { kind: 'field'; id: string }
   | { kind: 'palette'; type: FieldType }
   | null
+type MobilePanel = 'palette' | 'config' | null
 
 interface BuilderEditorProps {
   initialTemplate: FormTemplate
@@ -71,6 +73,7 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
   const [activeDrag, setActiveDrag] = useState<ActiveDrag>(null)
   const [insertIndex, setInsertIndex] = useState<number | null>(null)
   const [previewKey, setPreviewKey] = useState(0)
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -130,7 +133,9 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
     [markDirty],
   )
 
-  const handleSelect = useCallback((id: string) => setSelectedId(id), [])
+  const handleSelect = useCallback((id: string) => {
+    setSelectedId(id)
+  }, [])
 
   const handleRemove = useCallback(
     (id: string) => {
@@ -273,54 +278,58 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-2.5">
-        <Link
-          href="/"
-          onClick={handleLeave}
-          className="flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
-        >
-          <IconChevronLeft />
-        </Link>
-        <Logo compact />
-        <TextInput
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value)
-            markDirty()
-          }}
-          placeholder="Form title"
-          className="max-w-xs font-semibold"
-        />
-
-        <div className="mx-auto flex items-center gap-1 rounded-lg bg-canvas p-1">
-          {(['build', 'preview', 'responses'] as Tab[]).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => goTab(value)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition active:scale-[0.97] ${
-                tab === value
-                  ? 'bg-white text-ink shadow-sm'
-                  : 'text-muted hover:bg-white/60 hover:text-ink'
-              }`}
-            >
-              {value}
-            </button>
-          ))}
+    <div className="flex h-dvh flex-col">
+      <header className="shrink-0 border-b border-line bg-white">
+        <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
+          <Link
+            href="/"
+            onClick={handleLeave}
+            className="flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
+          >
+            <IconChevronLeft />
+          </Link>
+          <Logo compact />
+          <div className="ml-auto flex items-center gap-2">
+            {dirty ? (
+              <span className="hidden text-xs font-medium text-amber-600 sm:inline">
+                Unsaved changes
+              </span>
+            ) : (
+              <span className="hidden text-xs text-muted sm:inline">Saved</span>
+            )}
+            <Button variant="primary" onClick={persist} disabled={!dirty}>
+              Save
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {dirty ? (
-            <span className="text-xs font-medium text-amber-600">
-              Unsaved changes
-            </span>
-          ) : (
-            <span className="text-xs text-muted">Saved</span>
-          )}
-          <Button variant="primary" onClick={persist} disabled={!dirty}>
-            Save
-          </Button>
+        <div className="flex flex-col gap-2 px-3 pb-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 sm:pb-3">
+          <TextInput
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              markDirty()
+            }}
+            placeholder="Form title"
+            className="w-full min-w-0 font-semibold sm:max-w-xs"
+          />
+
+          <div className="mx-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-canvas p-1">
+            {(['build', 'preview', 'responses'] as Tab[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => goTab(value)}
+                className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium capitalize transition active:scale-[0.97] sm:px-4 ${
+                  tab === value
+                    ? 'bg-white text-ink shadow-sm'
+                    : 'text-muted hover:bg-white/60 hover:text-ink'
+                }`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -333,12 +342,12 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="grid flex-1 grid-cols-[260px_1fr_340px] overflow-hidden">
-            <aside className="overflow-y-auto border-r border-line bg-white p-4">
+          <div className="flex flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[260px_1fr_340px]">
+            <aside className="hidden overflow-y-auto border-r border-line bg-white p-4 lg:block">
               <FieldPalette onAdd={(type) => addField(type)} />
             </aside>
 
-            <main className="overflow-y-auto bg-canvas p-6">
+            <main className="flex-1 overflow-y-auto bg-canvas p-4 sm:p-6">
               <div className="mx-auto flex min-h-full max-w-2xl flex-col">
                 {instanceCount > 0 ? (
                   <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -367,7 +376,7 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
               </div>
             </main>
 
-            <aside className="overflow-y-auto border-l border-line bg-white">
+            <aside className="hidden overflow-y-auto border-l border-line bg-white lg:block">
               <ConfigPanel
                 field={selectedField}
                 allFields={fields}
@@ -375,7 +384,51 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
                 errors={selectedField ? configErrors[selectedField.id] : undefined}
               />
             </aside>
+
+            <div className="flex shrink-0 items-center gap-2 border-t border-line bg-white p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setMobilePanel('palette')}
+              >
+                <IconPlus /> Add field
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                disabled={!selectedField}
+                onClick={() => setMobilePanel('config')}
+              >
+                Configure
+              </Button>
+            </div>
           </div>
+
+          <Modal
+            open={mobilePanel === 'palette'}
+            title="Add field"
+            onClose={() => setMobilePanel(null)}
+          >
+            <FieldPalette
+              onAdd={(type) => {
+                addField(type)
+                setMobilePanel(null)
+              }}
+            />
+          </Modal>
+
+          <Modal
+            open={mobilePanel === 'config'}
+            title="Field settings"
+            onClose={() => setMobilePanel(null)}
+          >
+            <ConfigPanel
+              field={selectedField}
+              allFields={fields}
+              onChange={updateField}
+              errors={selectedField ? configErrors[selectedField.id] : undefined}
+            />
+          </Modal>
 
           <DragOverlay dropAnimation={{ duration: 180 }}>
             {activeDrag?.kind === 'field' ? (
@@ -390,8 +443,8 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
       ) : null}
 
       {tab === 'preview' ? (
-        <div className="flex-1 overflow-y-auto bg-canvas p-8">
-          <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-white p-6">
+        <div className="flex-1 overflow-y-auto bg-canvas p-4 sm:p-8">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-white p-4 sm:p-6">
             <h1 className="text-xl font-bold text-ink">{currentTemplate.title}</h1>
             <p className="mb-6 mt-1 text-sm text-muted">
               Fill in the form to test it. Submitting saves the template and adds a
@@ -408,7 +461,7 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
       ) : null}
 
       {tab === 'responses' ? (
-        <div className="flex-1 overflow-y-auto bg-canvas p-8">
+        <div className="flex-1 overflow-y-auto bg-canvas p-4 sm:p-8">
           <div className="mx-auto max-w-2xl">
             {dirty ? (
               <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">

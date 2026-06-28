@@ -24,15 +24,15 @@ export function InstancesPage() {
   if (!template) return null
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-10">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-10">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">{template.title}</h1>
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">{template.title}</h1>
           <p className="mt-1 text-sm text-muted">
             {count} response{count === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`/builder/${templateId}`}>
             <Button variant="secondary">Edit form</Button>
           </Link>

@@ -48,10 +48,10 @@ export function TemplatesListPage({ favouritesOnly }: TemplatesListPageProps) {
   }, [templates, favouritesOnly, query])
 
   return (
-    <div className="mx-auto max-w-6xl px-8 py-10">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10">
+      <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">
+          <h1 className="text-xl font-bold text-ink sm:text-2xl">
             {favouritesOnly ? 'Favourite Templates' : 'All Templates'}
           </h1>
           <p className="mt-1 text-sm text-muted">
@@ -60,8 +60,8 @@ export function TemplatesListPage({ favouritesOnly }: TemplatesListPageProps) {
               : 'Design form templates and collect responses.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-auto">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
               <IconSearch />
             </span>
@@ -69,7 +69,7 @@ export function TemplatesListPage({ favouritesOnly }: TemplatesListPageProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search templates"
-              className="w-56 pl-9"
+              className="w-full pl-9 sm:w-56"
             />
           </div>
           <Button variant="primary" onClick={() => router.push('/builder/new')}>

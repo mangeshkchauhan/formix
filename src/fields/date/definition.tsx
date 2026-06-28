@@ -34,7 +34,7 @@ export const dateDefinition = defineField<DateField>({
             onChange={(checked) => set({ prefillToday: checked })}
           />
         </ConfigRow>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ConfigRow label="Min date">
             <TextInput
               type="date"

@@ -176,7 +176,7 @@ function ConditionValueInput({
   if (operator === 'inRange') {
     const range = (value as RangeValue) ?? { min: 0, max: 0 }
     return (
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <TextInput
           type="number"
           value={range.min}

@@ -39,7 +39,7 @@ export function FillPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="flex items-center gap-3 border-b border-line bg-white px-6 py-3">
+      <header className="flex items-center gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
         <Link
           href="/"
           className="flex items-center text-sm font-medium text-muted hover:text-ink"
@@ -49,9 +49,9 @@ export function FillPage() {
         <Logo />
       </header>
 
-      <div className="mx-auto max-w-2xl px-6 py-10">
+      <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
         {submitted ? (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-6 text-center">
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-center sm:p-6">
             <h1 className="text-lg font-semibold text-ink">Response submitted</h1>
             <p className="mt-1 text-sm text-muted">
               Your response to "{template.title}" has been saved.
@@ -81,7 +81,7 @@ export function FillPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-line bg-white p-6">
+          <div className="rounded-2xl border border-line bg-white p-4 sm:p-6">
             <h1 className="text-xl font-bold text-ink">{template.title}</h1>
             <p className="mb-6 mt-1 text-sm text-muted">
               Fill in the form below and submit your response.

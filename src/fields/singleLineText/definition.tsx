@@ -33,7 +33,7 @@ export const singleLineTextDefinition = defineField<SingleLineTextField>({
             placeholder="Hint shown when empty"
           />
         </ConfigRow>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ConfigRow label="Min length">
             <TextInput
               type="number"
@@ -59,7 +59,7 @@ export const singleLineTextDefinition = defineField<SingleLineTextField>({
             />
           </ConfigRow>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ConfigRow label="Prefix">
             <TextInput
               value={field.config.prefix ?? ''}

@@ -42,12 +42,12 @@ export function ResponsesPanel({ template }: ResponsesPanelProps) {
         {rows.map((instance, index) => (
           <li
             key={instance.id}
-            className="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3"
+            className="flex flex-col gap-3 rounded-xl border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <button
               type="button"
               onClick={() => setViewing(instance)}
-              className="text-left transition hover:text-brand"
+              className="min-w-0 text-left transition hover:text-brand"
             >
               <p className="text-sm font-medium text-ink">
                 Response #{rows.length - index}
@@ -56,9 +56,13 @@ export function ResponsesPanel({ template }: ResponsesPanelProps) {
                 {formatDateTime(instance.submittedAt)}
               </p>
             </button>
-            <div className="flex items-center gap-1.5">
-              <Button variant="secondary" onClick={() => setViewing(instance)}>
-                <IconEye /> View
+            <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
+              <Button
+                variant="secondary"
+                aria-label="View response"
+                onClick={() => setViewing(instance)}
+              >
+                <IconEye /> <span className="hidden sm:inline">View</span>
               </Button>
               <Button
                 variant="secondary"

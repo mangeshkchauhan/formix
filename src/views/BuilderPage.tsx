@@ -15,18 +15,11 @@ export function BuilderPage() {
     isNew ? undefined : s.getTemplate(templateId),
   )
   // A draft is held in memory and only persisted on Save (no auto-save).
-  const [draft, setDraft] = useState(() => createDraftTemplate())
+  const [draft] = useState(() => createDraftTemplate())
 
   useEffect(() => {
     if (!isNew && !existing) router.replace('/')
   }, [isNew, existing, router])
-
-  // Re-entering "New Template" after a previous draft was saved must start fresh.
-  useEffect(() => {
-    if (isNew && useTemplatesStore.getState().getTemplate(draft.id)) {
-      setDraft(createDraftTemplate())
-    }
-  }, [isNew, draft.id])
 
   const template = isNew ? draft : existing
   if (!template) return null

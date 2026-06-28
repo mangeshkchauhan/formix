@@ -1,10 +1,15 @@
 import { ClientOnly } from '@/components/ClientOnly'
 import { BuilderPage } from '@/views/BuilderPage'
 
-export default function BuilderRoute() {
+export default async function BuilderRoute({
+  params,
+}: {
+  params: Promise<{ templateId: string }>
+}) {
+  const { templateId } = await params
   return (
     <ClientOnly>
-      <BuilderPage />
+      <BuilderPage key={templateId} />
     </ClientOnly>
   )
 }

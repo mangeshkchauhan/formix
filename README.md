@@ -1,36 +1,243 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Formix
 
-## Getting Started
+A browser-based form builder — design form templates in **Builder Mode**, fill them out
+in **Fill Mode**, and export submissions as PDF. Everything is stored in `localStorage`;
+there is no backend.
 
-First, run the development server:
+Built with **Next.js 16 (App Router) + React 19 + TypeScript**, **Tailwind CSS v4**,
+**Zustand**, and **dnd-kit**. PDF export uses **browser-native APIs only** (no PDF
+libraries).
+
+---
+
+## Running locally
+
+This project uses **bun** (a `bun.lock` is committed; `packageManager` is pinned to
+`bun@1.2.10`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun dev          # start the dev server (http://localhost:3000)
+bun run build    # production build
+bun start        # serve the production build
+bun run lint     # run ESLint (eslint-config-next)
+bun run typecheck # tsc --noEmit
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **10 field capabilities**: Single Line Text, Multi-line Text, Number, Date,
+  Single Select (radio / dropdown / tiles), Multi Select, File Upload (metadata only),
+  Section Header, Conditional Logic (on every field), and Calculation.
+- **Builder Mode**: left palette (click or drag to add), center canvas with
+  drag-and-drop reordering plus up/down buttons, right configuration panel, Save, and
+  inline Preview.
+- **Fill Mode**: real-time conditional visibility/required, real-time calculations,
+  submit-time validation, and PDF download.
+- **Template management**: searchable templates list, a Favourites view, and a per-card
+  favourite toggle.
+- **Persistence**: templates and submitted instances survive a full page refresh.
+- **PDF export**: native print document; hidden fields are excluded; re-downloadable
+  from the responses list.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## localStorage schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Two versioned, top-level keys managed by Zustand's `persist` middleware:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+formix:templates:v1   ->  { state: { templates: FormTemplate[] }, version: 1 }
+formix:instances:v1   ->  { state: { instances: FormInstance[] }, version: 1 }
+```
 
-## Deploy on Vercel
+```ts
+interface FormTemplate {
+  id: string
+  title: string
+  fields: AnyField[]      // discriminated union keyed on `type`
+  favorite: boolean       // surfaced in the Favourites view
+  createdAt: string       // ISO
+  updatedAt: string       // ISO
+}
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+interface FormInstance {
+  id: string
+  templateId: string                    // references a FormTemplate
+  values: Record<string, FieldValue>    // only VISIBLE input fields at submit time
+  submittedAt: string                   // ISO
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Why this shape
+
+- **Templates and instances are stored separately.** Instances reference a template by
+  `templateId`. This keeps each template document small, lets the response count be
+  derived (`instances.filter(i => i.templateId === t.id).length`), and means editing a
+  template never rewrites stored responses.
+- **Versioned keys + `version` field.** Enables `persist` migrations for future schema
+  changes without losing existing data after a refresh.
+- **Fields are a discriminated union** (`AnyField`) keyed on `type`, so consumers switch
+  exhaustively and the compiler enforces handling every field type.
+- **Files are metadata only** (`{ name, size, type }`). File bytes are never persisted
+  (localStorage is small and the spec forbids uploads); the PDF notes contents are not
+  embedded.
+- **Instances persist only visible input fields.** Hidden fields (per conditional logic)
+  and display-only fields (Section Header) are excluded at submit time, so hidden data
+  never enters storage or the PDF.
+
+---
+
+## Architecture & key decisions
+
+### Field registry — adding an 11th field type touches one folder
+
+Every field type lives in `src/fields/<type>/definition.tsx` and implements a single
+`FieldDefinition` contract (`src/fields/contract.ts`): palette metadata, `createDefault`,
+`ConfigPanel`, `Renderer`, `getEmptyValue`, `validate`, `validateConfig` (builder-time
+config rules), `toPdf`, and (for condition targets) `operators` + `evaluate`.
+
+All UI surfaces — the Builder palette, the configuration panel, the Fill renderer,
+validation, conditional-logic operators, and PDF serialization — read from
+`src/fields/registry.ts`. **Adding a new field type means creating one folder and adding
+one line to the registry map; no other file changes.**
+
+```
+fields/
+  contract.ts      # FieldDefinition interface + defineField() authoring helper
+  registry.ts      # the single map: FieldType -> FieldDefinition
+  types.ts         # discriminated-union field + value types
+  <type>/definition.tsx
+```
+
+### Conditional logic
+
+Implemented as a pure resolver in `src/logic/conditions.ts`:
+
+```ts
+resolveFieldStates(fields, values): Record<fieldId, { visible, required }>
+```
+
+- **Multiple conditions (the AND/OR decision):** conditions are evaluated
+  **independently and applied in declaration order; the last matching condition wins per
+  dimension** (visibility and required are independent). A single AND/OR over the whole
+  list cannot express conditions with *different* effects (e.g. "show when X" **and**
+  "become required when Y"), so this ordered/override model was chosen as strictly more
+  expressive and predictable.
+- **Chained conditions** (A depends on B depends on C) are resolved by **iterating to a
+  fixpoint** with a cycle guard, so changes cascade and converge deterministically.
+- **Hidden targets contribute no value:** when a condition's target field is currently
+  hidden, its value is treated as empty.
+- **Hidden-but-required is safe:** a hidden field is forced to non-required, never
+  validated, never submitted, and never exported.
+- A field **cannot target itself** (enforced in the editor and defensively in the engine).
+
+### Calculation
+
+`src/logic/calculation.ts` aggregates the **visible** source Number fields
+(sum / average / min / max), excludes hidden sources, ignores empty sources for averages,
+shows `—` when nothing is computable, and rounds to the configured precision. Calculation
+fields are always read-only and **cannot source another calculation field**. They
+recompute synchronously via a memo in `FormRenderer`, so they update in real time.
+
+### Validation
+
+`src/logic/validation.ts` runs on submit: it skips hidden fields entirely, checks the
+**computed** required state (not the raw toggle), then runs each field's per-type
+`validate`. This is the correctness-critical path for "hidden required fields must not be
+validated".
+
+### Builder-time configuration validation
+
+A template cannot be saved with an incompletely configured field. On **Save** (and on
+**Preview submit**, which also persists), `src/logic/configValidation.ts` collects
+problems across all fields and blocks the save when any exist: the first offending field
+is auto-selected, its problems are listed inline in the configuration panel, and a banner
+appears above the canvas. The generic "Label is required" rule lives in the collector
+(Label is required for every field type per the spec); type-specific rules are delegated
+to each field's `validateConfig`, so this stays inside the one-folder-per-field model.
+Current rules: Calculation needs ≥1 Number source; Single/Multi Select need ≥1 labelled
+option; Multi Select min ≤ max and max ≤ option count; Number/Date/text min ≤ max; File
+Upload max files ≥ 1.
+
+### PDF export
+
+`src/pdf/printInstance.ts` builds a self-contained, styled HTML document (title,
+submission timestamp, visible field labels + formatted values in form order), writes it
+into a hidden `<iframe>`, and calls the browser's native `print()`. Visibility is
+**re-resolved from the stored values** so conditionally hidden fields never appear, and
+the same path powers re-download from the responses list. No third-party PDF libraries
+are used.
+
+### State & routing
+
+Zustand stores (`store/templates.ts`, `store/instances.ts`) own all persisted data;
+Builder Mode keeps an editable draft in local component state and commits on Save.
+
+Routing uses the **Next.js App Router** (`app/`) with `next/navigation`. The `app/(main)`
+route group shares a common chrome via `AppLayout`, and the routes are:
+
+```
+/                                    -> templates list
+/favourites                          -> templates list, favourites only
+/builder/[templateId]                -> Builder Mode ("new" creates a fresh template)
+/fill/[templateId]                   -> Fill Mode
+/templates/[templateId]/instances    -> submitted responses
+```
+
+Because all data lives in `localStorage`, the data-driven pages are wrapped in a
+`ClientOnly` boundary so they render only after hydration; this avoids server/client
+markup mismatches while keeping real, refresh-safe URLs.
+
+---
+
+## Documented decisions for under-specified cases
+
+- The per-field **Required toggle is the field's `defaultRequired`**; conditions with
+  `require` / `unrequire` override it. **Default visibility** is `visible` unless changed.
+- **Multiple conditions:** ordered, last-match-wins per dimension (see above).
+- **Hidden values** are excluded from validation, calculations, condition evaluation,
+  submitted data, and PDF.
+- **Single Select** empty = no option selected; `does not equal` is `true` when nothing
+  is selected.
+- **Numbers** are formatted to the configured decimals; the `is within range` operator is
+  inclusive on both ends.
+- **Dates** are stored as ISO `yyyy-mm-dd`; `prefillToday` sets the value when a new
+  response is opened.
+- **Section Header** captures no value and is excluded from submitted data, but its
+  heading still renders in the PDF for grouping.
+- **File Upload** stores metadata only; the PDF lists `name (size, type)` and notes that
+  contents are not embedded.
+- **Calculation keeps a Required toggle and conditional logic** like any other input,
+  even though the spec lists neither for it: a calculation can legitimately be required
+  (e.g. an order total that must compute) and conditionally shown. A required calculation
+  that resolves to no value (no/empty sources) fails submit-time validation like any other
+  empty required field.
+- **Incomplete field config blocks Save** (rather than warning or saving silently) so a
+  template is never persisted in a non-functional state; see "Builder-time configuration
+  validation" above.
+- **Editing a template that already has responses is allowed but warns.** A banner in
+  Builder Mode flags that past responses may show stale or missing values, since instances
+  store raw values keyed by field id and are not migrated. Versioning is noted below as a
+  future improvement.
+
+---
+
+## What I'd improve with more time
+
+- Undo/redo and field duplication in Builder Mode.
+- Condition-builder warnings for cycles or contradictory effects.
+- Export/import templates as JSON and template versioning so old instances stay valid
+  when a template changes.
+- Unit tests for the conditional-logic and calculation engines (they are pure and highly
+  testable).
+- Richer PDF layout (logo, multi-column, explicit page breaks) within native constraints.
+
+---
+
+## Project documents
+
+- [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — the full design document.
+- [`AI_USAGE_LOG.md`](AI_USAGE_LOG.md) — AI usage log (prompts, verification, corrections).

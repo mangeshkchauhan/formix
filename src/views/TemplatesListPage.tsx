@@ -128,7 +128,11 @@ function TemplateCard({
   return (
     <div className="flex flex-col rounded-2xl border border-line bg-white p-5 transition hover:border-brand/40 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
-        <button type="button" onClick={onOpen} className="min-w-0 text-left">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 text-left transition hover:text-brand"
+        >
           <h2 className="truncate text-lg font-semibold text-ink">
             {template.title}
           </h2>
@@ -137,7 +141,7 @@ function TemplateCard({
           type="button"
           onClick={onToggleFavorite}
           aria-label={template.favorite ? 'Unfavourite' : 'Favourite'}
-          className={`shrink-0 rounded-lg p-1.5 transition ${
+          className={`shrink-0 rounded-lg p-1.5 transition active:scale-90 ${
             template.favorite
               ? 'text-amber-400 hover:bg-amber-50'
               : 'text-muted hover:bg-canvas hover:text-amber-400'
@@ -147,7 +151,11 @@ function TemplateCard({
         </button>
       </div>
 
-      <button type="button" onClick={onOpen} className="mt-4 text-left">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-4 text-left transition hover:opacity-80"
+      >
         <div className="flex gap-6">
           <Stat label="Fields" value={template.fields.length} />
           <Stat label="Responses" value={responseCount} />

@@ -47,7 +47,7 @@ export function ResponsesPanel({ template }: ResponsesPanelProps) {
             <button
               type="button"
               onClick={() => setViewing(instance)}
-              className="text-left"
+              className="text-left transition hover:text-brand"
             >
               <p className="text-sm font-medium text-ink">
                 Response #{rows.length - index}

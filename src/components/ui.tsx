@@ -71,7 +71,7 @@ export function Toggle({ checked, onChange, label }: ToggleProps) {
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink"
+      className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:border-brand/30 active:scale-[0.99]"
     >
       <span>{label}</span>
       <span
@@ -97,10 +97,12 @@ interface ButtonProps extends InputHTMLAttributes<HTMLButtonElement> {
 }
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-white hover:bg-brand/90',
-  secondary: 'border border-line bg-white text-ink hover:bg-canvas',
-  ghost: 'text-muted hover:bg-canvas hover:text-ink',
-  danger: 'border border-red-200 bg-white text-red-600 hover:bg-red-50',
+  primary: 'bg-brand text-white shadow-sm hover:bg-brand/90 hover:shadow active:scale-[0.97]',
+  secondary:
+    'border border-line bg-white text-ink hover:border-brand/20 hover:bg-canvas active:scale-[0.97]',
+  ghost: 'text-muted hover:bg-canvas hover:text-ink active:scale-[0.97]',
+  danger:
+    'border border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50 active:scale-[0.97]',
 }
 
 export function Button({
@@ -114,7 +116,7 @@ export function Button({
     <button
       {...props}
       type={(type as 'button' | 'submit' | 'reset') ?? 'button'}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${className ?? ''}`}
+      className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${buttonVariants[variant]} ${className ?? ''}`}
     >
       {children}
     </button>

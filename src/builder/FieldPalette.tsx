@@ -28,7 +28,7 @@ function PaletteItem({
       ref={setNodeRef}
       type="button"
       onClick={() => onAdd(type)}
-      className={`flex w-full items-start gap-3 rounded-lg border border-line bg-white p-3 text-left transition hover:border-brand/50 hover:bg-brand-soft/40 ${
+      className={`flex w-full items-start gap-3 rounded-lg border border-line bg-white p-3 text-left transition hover:border-brand/50 hover:bg-brand-soft/40 active:scale-[0.98] ${
         isDragging ? 'opacity-50' : ''
       }`}
       {...attributes}

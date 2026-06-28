@@ -28,6 +28,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  a[href]:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
 /* dnd-kit drag cursor helper */
 [data-dragging='true'] {
   cursor: grabbing;

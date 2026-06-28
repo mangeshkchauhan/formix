@@ -73,7 +73,7 @@ function FieldRowComponent({
           onClick={() => onMove(field.id, -1)}
           disabled={isFirst}
           aria-label="Move field up"
-          className="rounded p-1 text-muted hover:bg-canvas hover:text-ink disabled:opacity-30"
+          className="rounded p-1 text-muted transition hover:bg-canvas hover:text-ink active:scale-90 disabled:opacity-30"
         >
           <IconArrowUp />
         </button>
@@ -82,7 +82,7 @@ function FieldRowComponent({
           onClick={() => onMove(field.id, 1)}
           disabled={isLast}
           aria-label="Move field down"
-          className="rounded p-1 text-muted hover:bg-canvas hover:text-ink disabled:opacity-30"
+          className="rounded p-1 text-muted transition hover:bg-canvas hover:text-ink active:scale-90 disabled:opacity-30"
         >
           <IconArrowDown />
         </button>
@@ -90,7 +90,7 @@ function FieldRowComponent({
           type="button"
           onClick={() => onRemove(field.id)}
           aria-label="Delete field"
-          className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"
+          className="rounded p-1 text-muted transition hover:bg-red-50 hover:text-red-600 active:scale-90"
         >
           <IconTrash />
         </button>

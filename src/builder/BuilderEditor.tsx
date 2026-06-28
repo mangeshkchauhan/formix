@@ -299,10 +299,10 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
               key={value}
               type="button"
               onClick={() => goTab(value)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition ${
+              className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition active:scale-[0.97] ${
                 tab === value
                   ? 'bg-white text-ink shadow-sm'
-                  : 'text-muted hover:text-ink'
+                  : 'text-muted hover:bg-white/60 hover:text-ink'
               }`}
             >
               {value}

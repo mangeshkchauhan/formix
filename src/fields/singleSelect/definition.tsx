@@ -93,10 +93,10 @@ export const singleSelectDefinition = defineField<SingleSelectField>({
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(o.id)}
-                className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition ${
+                className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 ${
                   active
                     ? 'border-brand bg-brand-soft text-brand'
-                    : 'border-line bg-white text-ink hover:border-brand/40'
+                    : 'border-line bg-white text-ink hover:border-brand/40 hover:bg-brand-soft/30'
                 }`}
               >
                 {o.label}

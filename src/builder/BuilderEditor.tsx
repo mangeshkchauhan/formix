@@ -17,7 +17,7 @@ import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 
 import { useCallback, useMemo, useState, type MouseEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { fieldRegistry } from '../fields/registry'
 import type {
   AnyField,
@@ -45,6 +45,12 @@ import { FieldPalette } from './FieldPalette'
 import { FieldRowPreview, PalettePreview } from './DragPreview'
 
 type Tab = 'build' | 'preview' | 'responses'
+
+function parseTab(value: string | null): Tab {
+  if (value === 'preview' || value === 'responses') return value
+  return 'build'
+}
+
 type ActiveDrag =
   | { kind: 'field'; id: string }
   | { kind: 'palette'; type: FieldType }
@@ -57,6 +63,9 @@ interface BuilderEditorProps {
 
 export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const tab = parseTab(searchParams.get('tab'))
   const addTemplate = useTemplatesStore((s) => s.addTemplate)
   const updateTemplateFields = useTemplatesStore((s) => s.updateTemplateFields)
   const addInstance = useInstancesStore((s) => s.addInstance)
@@ -67,7 +76,6 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
   const [title, setTitle] = useState(initialTemplate.title)
   const [fields, setFields] = useState<AnyField[]>(initialTemplate.fields)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('build')
   const [dirty, setDirty] = useState(false)
   const [configErrors, setConfigErrors] = useState<ConfigErrors>({})
   const [activeDrag, setActiveDrag] = useState<ActiveDrag>(null)
@@ -89,6 +97,21 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
   }, [])
 
   const markDirty = useCallback(() => setDirty(true), [])
+
+  const goTab = useCallback(
+    (next: Tab) => {
+      if (next === 'preview') setPreviewKey((k) => k + 1)
+      const params = new URLSearchParams(searchParams.toString())
+      if (next === 'build') {
+        params.delete('tab')
+      } else {
+        params.set('tab', next)
+      }
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    },
+    [pathname, router, searchParams],
+  )
 
   const selectedField = useMemo(
     () => fields.find((f) => f.id === selectedId) ?? null,
@@ -243,7 +266,7 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
       setConfigErrors(errors)
       const firstInvalid = fields.find((f) => errors[f.id])
       if (firstInvalid) setSelectedId(firstInvalid.id)
-      setTab('build')
+      goTab('build')
       return false
     }
     setConfigErrors({})
@@ -254,21 +277,30 @@ export function BuilderEditor({ initialTemplate }: BuilderEditorProps) {
       updateTemplateFields(initialTemplate.id, fields, cleanTitle)
     } else {
       addTemplate({ ...initialTemplate, title: cleanTitle, fields })
-      router.replace(`/builder/${initialTemplate.id}`)
+      const qs = searchParams.toString()
+      router.replace(
+        qs
+          ? `/builder/${initialTemplate.id}?${qs}`
+          : `/builder/${initialTemplate.id}`,
+      )
     }
     setDirty(false)
     return true
-  }, [title, fields, initialTemplate, updateTemplateFields, addTemplate, router])
+  }, [
+    title,
+    fields,
+    initialTemplate,
+    updateTemplateFields,
+    addTemplate,
+    router,
+    searchParams,
+    goTab,
+  ])
 
   const handlePreviewSubmit = (values: Record<string, FieldValue>) => {
     if (!persist()) return
     addInstance(initialTemplate.id, values)
-    setTab('responses')
-  }
-
-  const goTab = (next: Tab) => {
-    if (next === 'preview') setPreviewKey((k) => k + 1)
-    setTab(next)
+    goTab('responses')
   }
 
   const handleLeave = (e: MouseEvent) => {

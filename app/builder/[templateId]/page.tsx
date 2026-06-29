@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { ClientOnly } from '@/components/ClientOnly'
 import { BuilderPage } from '@/views/BuilderPage'
 
@@ -9,7 +10,9 @@ export default async function BuilderRoute({
   const { templateId } = await params
   return (
     <ClientOnly>
-      <BuilderPage key={templateId} />
+      <Suspense fallback={null}>
+        <BuilderPage key={templateId} />
+      </Suspense>
     </ClientOnly>
   )
 }
